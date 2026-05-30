@@ -93,7 +93,7 @@ class VoiceAIAgent:
         if not isinstance(item, ChatMessage):
             return
         
-        text = item.text_content() or ""
+        text = item.text_content or ""
         if not text.strip():
             return
 
@@ -103,7 +103,7 @@ class VoiceAIAgent:
                 "role": "user",
                 "text": text,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
-                "confidence": item.transcript_confidence or 1.0,
+                "confidence": getattr(item, "transcript_confidence", 1.0),
             })
             self.agent_logger.log_turn(session, role="user", text=text)
             logger.info(f"[{session.session_id}] USER: {text[:120]}")
@@ -136,12 +136,14 @@ class VoiceAIAgent:
         """Generate a dynamic greeting and say it to the user."""
         logger.info(f"[{session.session_id}] Generating dynamic greeting...")
         try:
-            greeting_ctx = llm.ChatContext().append(
+            greeting_ctx = llm.ChatContext()
+            greeting_ctx.add_message(
                 role="system",
-                text=self._build_system_prompt(session)
-            ).append(
+                content=self._build_system_prompt(session),
+            )
+            greeting_ctx.add_message(
                 role="user",
-                text="Please generate the initial greeting for this call according to the policy. Speak directly to the rep. Do not include any other text."
+                content="Please generate the initial greeting for this call according to the policy. Speak directly to the rep. Do not include any other text.",
             )
             
             greeting_response = await lm.chat(chat_ctx=greeting_ctx).collect()
@@ -192,24 +194,22 @@ class VoiceAIAgent:
         )
 
         # Function Context — Sharp pipeline tools
-        fnc_ctx = PipelineReviewTools()
+        fnc_ctx = PipelineReviewTools(id="pipeline_review_tools")
 
         # LLM — Gemini (high performance + cost-effective for voice)
-        initial_ctx = llm.ChatContext().append(
+        initial_ctx = llm.ChatContext()
+        initial_ctx.add_message(
             role="system",
-            text=self._build_system_prompt(session),
+            content=self._build_system_prompt(session),
         )
         lm = google.LLM(
             model=self.config.get("llm_model", "gemini-3.5-flash"),
             temperature=0.3,
+            api_key=self.config.get("google_api_key"),
         )
 
-        # TTS — OpenAI with alloy voice (low latency)
-        tts = openai.TTS(
-            model="tts-1",
-            voice=self.config.get("tts_voice", "alloy"),
-            speed=1.0,
-        )
+        # TTS — Deepgram Aura (low latency, no OpenAI key required)
+        tts = deepgram.TTS()
 
         # VAD — Silero for precise end-of-speech detection
         vad = silero.VAD.load(
@@ -251,7 +251,13 @@ class VoiceAIAgent:
 
         # Keep running until the room closes
         try:
-            await ctx.room.run_until_disconnected()
+            disconnected = asyncio.Event()
+
+            @ctx.room.on("disconnected")
+            def on_disconnected():
+                disconnected.set()
+
+            await disconnected.wait()
         finally:
             session.ended_at = datetime.now(timezone.utc)
             await self._finalize_session(session)
@@ -293,6 +299,7 @@ async def _global_entrypoint(ctx: JobContext):
         "llm_model": config.llm_model,
         "tts_voice": config.tts_voice,
         "greeting": config.greeting,
+        "google_api_key": config.google_api_key,
     }
     agent = VoiceAIAgent(agent_config)
     await agent.entrypoint(ctx)
