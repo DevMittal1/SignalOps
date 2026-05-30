@@ -17,12 +17,13 @@ from livekit.agents import (
     AutoSubscribe,
     JobContext,
     WorkerOptions,
+    WorkerType,
     cli,
     llm,
     AgentSession,
 )
 from livekit.agents.voice import Agent
-from livekit.plugins import deepgram, openai, silero
+from livekit.plugins import deepgram, google, openai, silero
 
 from monitoring.cost_tracker import CostTracker
 from monitoring.logger import AgentLogger
@@ -131,7 +132,7 @@ class VoiceAIAgent:
                 arguments=call.arguments,
             )
 
-    async def _generate_and_speak_greeting(self, session: CallSession, assistant: AgentSession, lm: openai.LLM):
+    async def _generate_and_speak_greeting(self, session: CallSession, assistant: AgentSession, lm: llm.LLM):
         """Generate a dynamic greeting and say it to the user."""
         logger.info(f"[{session.session_id}] Generating dynamic greeting...")
         try:
@@ -193,13 +194,13 @@ class VoiceAIAgent:
         # Function Context — Sharp pipeline tools
         fnc_ctx = PipelineReviewTools()
 
-        # LLM — GPT-4o-mini (fast + cost-effective for voice)
+        # LLM — Gemini (high performance + cost-effective for voice)
         initial_ctx = llm.ChatContext().append(
             role="system",
             text=self._build_system_prompt(session),
         )
-        lm = openai.LLM(
-            model=self.config.get("llm_model", "gpt-4o-mini"),
+        lm = google.LLM(
+            model=self.config.get("llm_model", "gemini-3.5-flash"),
             temperature=0.3,
         )
 
@@ -284,10 +285,22 @@ class VoiceAIAgent:
         self._active_sessions.pop(session.session_id, None)
 
 
+async def _global_entrypoint(ctx: JobContext):
+    """Pickleable entrypoint wrapper that lazily constructs the agent."""
+    from config.settings import load_config
+    config = load_config()
+    agent_config = {
+        "llm_model": config.llm_model,
+        "tts_voice": config.tts_voice,
+        "greeting": config.greeting,
+    }
+    agent = VoiceAIAgent(agent_config)
+    await agent.entrypoint(ctx)
+
+
 def create_agent_worker(config: dict) -> WorkerOptions:
-    agent = VoiceAIAgent(config)
     return WorkerOptions(
-        entrypoint_fnc=agent.entrypoint,
-        worker_type="room",
+        entrypoint_fnc=_global_entrypoint,
+        worker_type=WorkerType.ROOM,
         max_retry=3,
     )

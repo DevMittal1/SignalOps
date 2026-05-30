@@ -29,6 +29,10 @@ PRICING = {
             "input_per_1k_tokens": 0.00015,
             "output_per_1k_tokens": 0.00060,
         },
+        "gemini-3.5-flash": {
+            "input_per_1k_tokens": 0.000075,
+            "output_per_1k_tokens": 0.00030,
+        },
         "gpt-4o": {
             "input_per_1k_tokens": 0.0050,
             "output_per_1k_tokens": 0.0150,
@@ -68,7 +72,7 @@ class SessionCosts:
     # LLM
     llm_input_tokens: int = 0
     llm_output_tokens: int = 0
-    llm_model: str = "gpt-4o-mini"
+    llm_model: str = "gemini-3.5-flash"
     llm_cost_usd: float = 0.0
 
     # STT
@@ -118,7 +122,7 @@ class CostTracker:
         session_id: str,
         input_tokens: int,
         output_tokens: int,
-        model: str = "gpt-4o-mini",
+        model: str = "gemini-3.5-flash",
     ) -> None:
         with self._lock:
             s = self._get_or_create(session_id)
@@ -126,7 +130,7 @@ class CostTracker:
             s.llm_output_tokens += output_tokens
             s.llm_model = model
 
-            pricing = PRICING["llm"].get(model, PRICING["llm"]["gpt-4o-mini"])
+            pricing = PRICING["llm"].get(model, PRICING["llm"]["gemini-3.5-flash"])
             cost = (
                 input_tokens / 1000 * pricing["input_per_1k_tokens"]
                 + output_tokens / 1000 * pricing["output_per_1k_tokens"]

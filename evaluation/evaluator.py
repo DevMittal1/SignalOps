@@ -126,20 +126,24 @@ Respond with ONLY this JSON structure:
 
 class ConversationEvaluator:
     """
-    Evaluates conversation quality using GPT-4o-mini as an LLM judge.
+    Evaluates conversation quality using gemini-3.5-flash as an LLM judge.
     Designed to run asynchronously after a call ends — never on the critical path.
     """
 
     def __init__(
         self,
-        model: str = "gpt-4o-mini",
+        model: str = "gemini-3.5-flash",
         max_transcript_chars: int = 8000,
         timeout_seconds: float = 30.0,
     ):
         self.model = model
         self.max_transcript_chars = max_transcript_chars
         self.timeout_seconds = timeout_seconds
-        self.api_key = os.environ.get("OPENAI_API_KEY", "")
+        self.api_key = (
+            os.environ.get("GEMINI_API_KEY") 
+            or os.environ.get("GOOGLE_API_KEY") 
+            or os.environ.get("OPENAI_API_KEY", "")
+        )
         self._http = httpx.AsyncClient(timeout=self.timeout_seconds)
 
     def _format_transcript(self, session: Any) -> str:
@@ -157,7 +161,7 @@ class ConversationEvaluator:
     async def evaluate_async(self, session: Any) -> dict:
         """Evaluate a completed call session. Returns evaluation dict."""
         if not self.api_key:
-            logger.warning("No OPENAI_API_KEY set — skipping evaluation")
+            logger.warning("No GEMINI_API_KEY or OPENAI_API_KEY set — skipping evaluation")
             return EvaluationResult(session_id=session.session_id).to_dict()
 
         transcript = self._format_transcript(session)
@@ -166,15 +170,23 @@ class ConversationEvaluator:
 
         prompt = EVALUATION_PROMPT.format(transcript=transcript)
 
+        # Route requests to Gemini's OpenAI-compatible endpoint, falling back to OpenAI if key starts with sk-
+        url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+        model = self.model
+        if self.api_key.startswith("sk-"):
+            url = "https://api.openai.com/v1/chat/completions"
+            if model == "gemini-3.5-flash":
+                model = "gpt-4o-mini"
+
         try:
             resp = await self._http.post(
-                "https://api.openai.com/v1/chat/completions",
+                url,
                 headers={
                     "Authorization": f"Bearer {self.api_key}",
                     "Content-Type": "application/json",
                 },
                 json={
-                    "model": self.model,
+                    "model": model,
                     "messages": [{"role": "user", "content": prompt}],
                     "temperature": 0.1,
                     "max_tokens": 600,

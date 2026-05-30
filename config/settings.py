@@ -17,14 +17,14 @@ class AgentConfig:
     livekit_api_key: str = ""
     livekit_api_secret: str = ""
 
-    # OpenAI
-    openai_api_key: str = ""
+    # Google Gemini
+    gemini_api_key: str = ""
 
     # Deepgram
     deepgram_api_key: str = ""
 
     # Agent behaviour
-    llm_model: str = "gpt-4o-mini"
+    llm_model: str = "gemini-3.5-flash"
     tts_voice: str = "alloy"
     greeting: str = "Hello! How can I help you today?"
     max_call_minutes: int = 30
@@ -44,9 +44,9 @@ def load_config() -> AgentConfig:
         livekit_url=os.environ.get("LIVEKIT_URL", ""),
         livekit_api_key=os.environ.get("LIVEKIT_API_KEY", ""),
         livekit_api_secret=os.environ.get("LIVEKIT_API_SECRET", ""),
-        openai_api_key=os.environ.get("OPENAI_API_KEY", ""),
+        gemini_api_key=os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY", ""),
         deepgram_api_key=os.environ.get("DEEPGRAM_API_KEY", ""),
-        llm_model=os.environ.get("LLM_MODEL", "gpt-4o-mini"),
+        llm_model=os.environ.get("LLM_MODEL", "gemini-3.5-flash"),
         tts_voice=os.environ.get("TTS_VOICE", "alloy"),
         greeting=os.environ.get("AGENT_GREETING", "Hello! How can I help you today?"),
         log_dir=os.environ.get("LOG_DIR", "./logs"),
@@ -60,7 +60,7 @@ def load_config() -> AgentConfig:
         "LIVEKIT_URL": cfg.livekit_url,
         "LIVEKIT_API_KEY": cfg.livekit_api_key,
         "LIVEKIT_API_SECRET": cfg.livekit_api_secret,
-        "OPENAI_API_KEY": cfg.openai_api_key,
+        "GEMINI_API_KEY": cfg.gemini_api_key,
         "DEEPGRAM_API_KEY": cfg.deepgram_api_key,
     }
 

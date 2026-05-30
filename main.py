@@ -12,6 +12,9 @@ from livekit.agents import cli
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from agent.voice_agent import create_agent_worker
 from config.settings import load_config
 from monitoring.logger import setup_logging
