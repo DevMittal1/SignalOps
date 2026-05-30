@@ -1,19 +1,21 @@
 from typing import Annotated
+from pydantic import Field
 from livekit.agents import llm
 import logging
 
 logger = logging.getLogger(__name__)
 
-class PipelineReviewTools(llm.FunctionContext):
+
+class PipelineReviewTools(llm.Toolset):
     """
     Tools for the Pipeline Review Agent.
     Note: These are mocked for demonstration purposes.
     """
 
-    @llm.ai_callable(description="Get the purpose and context for calling a specific sales rep.")
+    @llm.function_tool(description="Get the purpose and context for calling a specific sales rep.")
     def get_call_context(
         self,
-        rep_id: Annotated[str, llm.TypeInfo(description="The unique ID of the sales representative.")]
+        rep_id: Annotated[str, Field(description="The unique ID of the sales representative.")]
     ) -> dict:
         logger.info(f"Tool call: get_call_context(rep_id={rep_id})")
         return {
@@ -24,10 +26,10 @@ class PipelineReviewTools(llm.FunctionContext):
             "active_deals_to_review": 1
         }
 
-    @llm.ai_callable(description="Retrieve official policy answers about call recording, privacy, and data usage.")
+    @llm.function_tool(description="Retrieve official policy answers about call recording, privacy, and data usage.")
     def get_agent_policy(
         self,
-        topic: Annotated[str, llm.TypeInfo(description="The topic to look up (e.g., 'recording', 'privacy', 'quota').")]
+        topic: Annotated[str, Field(description="The topic to look up (e.g., 'recording', 'privacy', 'visibility', 'quota').")]
     ) -> dict:
         logger.info(f"Tool call: get_agent_policy(topic={topic})")
         policies = {
@@ -38,10 +40,10 @@ class PipelineReviewTools(llm.FunctionContext):
         }
         return {"answer": policies.get(topic, "I don't have a specific policy on that topic, but I can tell you this is a standard pipeline visibility check.")}
 
-    @llm.ai_callable(description="Fetch the core details of a specific deal from the CRM.")
+    @llm.function_tool(description="Fetch the core details of a specific deal from the CRM.")
     def get_deal_context(
         self,
-        deal_id: Annotated[str, llm.TypeInfo(description="The unique ID of the deal/opportunity.")]
+        deal_id: Annotated[str, Field(description="The unique ID of the deal/opportunity.")]
     ) -> dict:
         logger.info(f"Tool call: get_deal_context(deal_id={deal_id})")
         return {
@@ -55,10 +57,10 @@ class PipelineReviewTools(llm.FunctionContext):
             "last_rep_update_days_ago": 6
         }
 
-    @llm.ai_callable(description="Fetch the history of stage changes and close-date movements for a deal.")
+    @llm.function_tool(description="Fetch the history of stage changes and close-date movements for a deal.")
     def get_deal_timeline(
         self,
-        deal_id: Annotated[str, llm.TypeInfo(description="The unique ID of the deal.")]
+        deal_id: Annotated[str, Field(description="The unique ID of the deal.")]
     ) -> dict:
         logger.info(f"Tool call: get_deal_timeline(deal_id={deal_id})")
         return {
@@ -70,10 +72,10 @@ class PipelineReviewTools(llm.FunctionContext):
             ]
         }
 
-    @llm.ai_callable(description="Retrieve historical profile and performance patterns for a sales rep.")
+    @llm.function_tool(description="Retrieve historical profile and performance patterns for a sales rep.")
     def get_rep_context(
         self,
-        rep_id: Annotated[str, llm.TypeInfo(description="The unique ID of the sales representative.")]
+        rep_id: Annotated[str, Field(description="The unique ID of the sales representative.")]
     ) -> dict:
         logger.info(f"Tool call: get_rep_context(rep_id={rep_id})")
         return {
@@ -85,10 +87,10 @@ class PipelineReviewTools(llm.FunctionContext):
             "notes": ["Strong at discovery", "Often optimistic in late-stage deals"]
         }
 
-    @llm.ai_callable(description="Retrieve summary and objections from the last customer interaction.")
+    @llm.function_tool(description="Retrieve summary and objections from the last customer interaction.")
     def get_last_customer_interaction(
         self,
-        deal_id: Annotated[str, llm.TypeInfo(description="The unique ID of the deal.")]
+        deal_id: Annotated[str, Field(description="The unique ID of the deal.")]
     ) -> dict:
         logger.info(f"Tool call: get_last_customer_interaction(deal_id={deal_id})")
         return {
@@ -98,10 +100,10 @@ class PipelineReviewTools(llm.FunctionContext):
             "next_step": "send docs"
         }
 
-    @llm.ai_callable(description="Retrieve the stakeholder map for a deal, including champion and blockers.")
+    @llm.function_tool(description="Retrieve the stakeholder map for a deal, including champion and blockers.")
     def get_stakeholder_map(
         self,
-        deal_id: Annotated[str, llm.TypeInfo(description="The unique ID of the deal.")]
+        deal_id: Annotated[str, Field(description="The unique ID of the deal.")]
     ) -> dict:
         logger.info(f"Tool call: get_stakeholder_map(deal_id={deal_id})")
         return {
@@ -112,10 +114,10 @@ class PipelineReviewTools(llm.FunctionContext):
             "risk_flags": ["No confirmed economic buyer meeting", "Legal stakeholder not named"]
         }
 
-    @llm.ai_callable(description="Get activity health metrics (emails, meetings, outreach) for a deal.")
+    @llm.function_tool(description="Get activity health metrics (emails, meetings, outreach) for a deal.")
     def get_activity_health(
         self,
-        deal_id: Annotated[str, llm.TypeInfo(description="The unique ID of the deal.")]
+        deal_id: Annotated[str, Field(description="The unique ID of the deal.")]
     ) -> dict:
         logger.info(f"Tool call: get_activity_health(deal_id={deal_id})")
         return {
@@ -127,10 +129,10 @@ class PipelineReviewTools(llm.FunctionContext):
             "last_customer_reply_sentiment": "neutral"
         }
 
-    @llm.ai_callable(description="Inspect internal dependencies that may be blocking a deal.")
+    @llm.function_tool(description="Inspect internal dependencies that may be blocking a deal.")
     def get_internal_dependency_status(
         self,
-        deal_id: Annotated[str, llm.TypeInfo(description="The unique ID of the deal.")]
+        deal_id: Annotated[str, Field(description="The unique ID of the deal.")]
     ) -> dict:
         logger.info(f"Tool call: get_internal_dependency_status(deal_id={deal_id})")
         return {
@@ -140,10 +142,10 @@ class PipelineReviewTools(llm.FunctionContext):
             ]
         }
 
-    @llm.ai_callable(description="Define a business or pipeline-specific term for the rep.")
+    @llm.function_tool(description="Define a business or pipeline-specific term for the rep.")
     def explain_term(
         self,
-        term: Annotated[str, llm.TypeInfo(description="The term to define.")]
+        term: Annotated[str, Field(description="The term to define.")]
     ) -> dict:
         logger.info(f"Tool call: explain_term(term={term})")
         definitions = {
@@ -153,10 +155,10 @@ class PipelineReviewTools(llm.FunctionContext):
         }
         return {"definition": definitions.get(term.lower(), "I don't have a specific definition for that term in my policy.")}
 
-    @llm.ai_callable(description="Retrieve a static list of sharp management-style follow-up questions to use when a rep gives a vague answer.")
+    @llm.function_tool(description="Retrieve a static list of sharp management-style follow-up questions to use when a rep gives a vague answer.")
     def get_static_followup(
         self,
-        statement: Annotated[str, llm.TypeInfo(description="The vague statement made by the rep.")]
+        statement: Annotated[str, Field(description="The vague statement made by the rep.")]
     ) -> dict:
         logger.info(f"Tool call: get_static_followup(statement={statement})")
         return {
@@ -168,26 +170,26 @@ class PipelineReviewTools(llm.FunctionContext):
             ]
         }
 
-    @llm.ai_callable(description="Store a verified fact discovered during the call conversation.")
+    @llm.function_tool(description="Store a verified fact discovered during the call conversation.")
     def append_call_fact(
         self,
-        call_id: Annotated[str, llm.TypeInfo(description="The unique ID of the current call session.")],
-        fact_type: Annotated[str, llm.TypeInfo(description="The type of fact (e.g., 'blocker_candidate', 'owner').")],
-        value: Annotated[str, llm.TypeInfo(description="The content of the fact.")],
-        confidence: Annotated[float, llm.TypeInfo(description="Confidence score (0.0 to 1.0).")]
+        call_id: Annotated[str, Field(description="The unique ID of the current call session.")],
+        fact_type: Annotated[str, Field(description="The type of fact (e.g., 'blocker_candidate', 'owner').")],
+        value: Annotated[str, Field(description="The content of the fact.")],
+        confidence: Annotated[float, Field(description="Confidence score (0.0 to 1.0).")]
     ) -> dict:
         logger.info(f"Fact recorded: {fact_type}={value} (conf={confidence})")
         return {"success": True}
 
-    @llm.ai_callable(description="Persist the final structured summary and evidence at the end of the call.")
+    @llm.function_tool(description="Persist the final structured summary and evidence at the end of the call.")
     def save_call_summary(
         self,
-        call_id: Annotated[str, llm.TypeInfo(description="The unique ID of the call session.")],
-        deal_id: Annotated[str, llm.TypeInfo(description="The deal ID.")],
-        primary_blocker: Annotated[str, llm.TypeInfo(description="The main identified blocker.")],
-        root_cause: Annotated[str, llm.TypeInfo(description="The root cause of the blocker.")],
-        evidence: Annotated[list[str], llm.TypeInfo(description="Key pieces of evidence supporting the findings.")],
-        confidence: Annotated[float, llm.TypeInfo(description="Final confidence score.")]
+        call_id: Annotated[str, Field(description="The unique ID of the call session.")],
+        deal_id: Annotated[str, Field(description="The deal ID.")],
+        primary_blocker: Annotated[str, Field(description="The main identified blocker.")],
+        root_cause: Annotated[str, Field(description="The root cause of the blocker.")],
+        evidence: Annotated[list[str], Field(description="Key pieces of evidence supporting the findings.")],
+        confidence: Annotated[float, Field(description="Final confidence score.")]
     ) -> dict:
         logger.info(f"Summary saved for call {call_id}: {primary_blocker}")
         return {"success": True, "summary_id": "sum_5521"}

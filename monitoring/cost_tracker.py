@@ -13,7 +13,7 @@ import logging
 import threading
 from collections import defaultdict
 from dataclasses import dataclass, field, asdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -57,17 +57,13 @@ PRICING = {
     "livekit": {
         "per_minute_per_participant": 0.003,
     },
-    "twilio": {
-        "per_minute_inbound": 0.0085,
-        "per_minute_outbound": 0.0140,
-    },
 }
 
 
 @dataclass
 class SessionCosts:
     session_id: str
-    started_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    started_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     # LLM
     llm_input_tokens: int = 0
@@ -87,10 +83,8 @@ class SessionCosts:
 
     # Infrastructure
     call_minutes: float = 0.0
-    call_type: str = "inbound"          # inbound | outbound
     livekit_participants: int = 2
     livekit_cost_usd: float = 0.0
-    twilio_cost_usd: float = 0.0
 
     total_cost_usd: float = 0.0
 
@@ -170,26 +164,16 @@ class CostTracker:
         self,
         session_id: str,
         duration_seconds: float,
-        call_type: str = "inbound",
         participants: int = 2,
     ) -> None:
         with self._lock:
             s = self._get_or_create(session_id)
             minutes = duration_seconds / 60.0
             s.call_minutes = minutes
-            s.call_type = call_type
             s.livekit_participants = participants
 
             # LiveKit cost
             s.livekit_cost_usd = minutes * participants * PRICING["livekit"]["per_minute_per_participant"]
-
-            # Twilio cost
-            twilio_rate = (
-                PRICING["twilio"]["per_minute_inbound"]
-                if call_type == "inbound"
-                else PRICING["twilio"]["per_minute_outbound"]
-            )
-            s.twilio_cost_usd = minutes * twilio_rate
             self._update_total(s)
 
     def _update_total(self, s: SessionCosts) -> None:
@@ -198,7 +182,6 @@ class CostTracker:
             + s.stt_cost_usd
             + s.tts_cost_usd
             + s.livekit_cost_usd
-            + s.twilio_cost_usd
         )
         if s.total_cost_usd > self._alert_threshold_usd:
             logger.warning(
@@ -219,7 +202,7 @@ class CostTracker:
                 "stt_pct": round(s.stt_cost_usd / max(s.total_cost_usd, 0.000001) * 100, 1),
                 "tts_pct": round(s.tts_cost_usd / max(s.total_cost_usd, 0.000001) * 100, 1),
                 "infra_pct": round(
-                    (s.livekit_cost_usd + s.twilio_cost_usd)
+                    s.livekit_cost_usd
                     / max(s.total_cost_usd, 0.000001) * 100, 1
                 ),
             }
@@ -228,7 +211,7 @@ class CostTracker:
     def get_aggregate_stats(self, hours: int = 24) -> dict:
         """Aggregate stats across all sessions in the last N hours."""
         with self._lock:
-            cutoff = datetime.utcnow() - timedelta(hours=hours)
+            cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
             relevant = [
                 s for s in self._sessions.values()
                 if datetime.fromisoformat(s.started_at) >= cutoff
@@ -253,7 +236,6 @@ class CostTracker:
                     "stt_usd": round(sum(s.stt_cost_usd for s in relevant), 4),
                     "tts_usd": round(sum(s.tts_cost_usd for s in relevant), 4),
                     "livekit_usd": round(sum(s.livekit_cost_usd for s in relevant), 4),
-                    "twilio_usd": round(sum(s.twilio_cost_usd for s in relevant), 4),
                 },
             }
 

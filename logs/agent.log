@@ -1,0 +1,62 @@
+{"ts": "2026-05-30T15:48:21.196138Z", "level": "INFO", "logger": "root", "msg": "Logging configured", "module": "logger", "line": 116, "context": {"log_dir": "./logs", "level": "INFO"}}
+{"ts": "2026-05-30T15:48:21.196212Z", "level": "INFO", "logger": "__main__", "msg": "============================================================", "module": "main", "line": 32}
+{"ts": "2026-05-30T15:48:21.196252Z", "level": "INFO", "logger": "__main__", "msg": "LiveKit Voice AI Agent Starting", "module": "main", "line": 33}
+{"ts": "2026-05-30T15:48:21.196277Z", "level": "INFO", "logger": "__main__", "msg": "  LLM Model:    gpt-4o-mini", "module": "main", "line": 34}
+{"ts": "2026-05-30T15:48:21.196299Z", "level": "INFO", "logger": "__main__", "msg": "  TTS Voice:    alloy", "module": "main", "line": 35}
+{"ts": "2026-05-30T15:48:21.196318Z", "level": "INFO", "logger": "__main__", "msg": "  LiveKit URL:  ", "module": "main", "line": 36}
+{"ts": "2026-05-30T15:48:21.196336Z", "level": "INFO", "logger": "__main__", "msg": "  Log Dir:      ./logs", "module": "main", "line": 37}
+{"ts": "2026-05-30T15:48:21.196353Z", "level": "INFO", "logger": "__main__", "msg": "============================================================", "module": "main", "line": 38}
+{"ts": "2026-05-30T15:48:21.196390Z", "level": "INFO", "logger": "monitoring.cost_tracker", "msg": "CostTracker initialised", "module": "cost_tracker", "line": 107}
+{"ts": "2026-05-30T15:48:24.049929Z", "level": "INFO", "logger": "root", "msg": "Logging configured", "module": "logger", "line": 116, "context": {"log_dir": "./logs", "level": "INFO"}}
+{"ts": "2026-05-30T15:48:24.050015Z", "level": "INFO", "logger": "__main__", "msg": "============================================================", "module": "main", "line": 32}
+{"ts": "2026-05-30T15:48:24.050053Z", "level": "INFO", "logger": "__main__", "msg": "LiveKit Voice AI Agent Starting", "module": "main", "line": 33}
+{"ts": "2026-05-30T15:48:24.050084Z", "level": "INFO", "logger": "__main__", "msg": "  LLM Model:    gpt-4o-mini", "module": "main", "line": 34}
+{"ts": "2026-05-30T15:48:24.050110Z", "level": "INFO", "logger": "__main__", "msg": "  TTS Voice:    alloy", "module": "main", "line": 35}
+{"ts": "2026-05-30T15:48:24.050129Z", "level": "INFO", "logger": "__main__", "msg": "  LiveKit URL:  ", "module": "main", "line": 36}
+{"ts": "2026-05-30T15:48:24.050151Z", "level": "INFO", "logger": "__main__", "msg": "  Log Dir:      ./logs", "module": "main", "line": 37}
+{"ts": "2026-05-30T15:48:24.050172Z", "level": "INFO", "logger": "__main__", "msg": "============================================================", "module": "main", "line": 38}
+{"ts": "2026-05-30T15:48:24.050206Z", "level": "INFO", "logger": "monitoring.cost_tracker", "msg": "CostTracker initialised", "module": "cost_tracker", "line": 107}
+{"ts": "2026-05-30T15:48:24.536644Z", "level": "INFO", "logger": "livekit", "msg": "livekit_ffi::server:153:livekit_ffi::server - initializing ffi server v0.12.56", "module": "_ffi_client", "line": 174}
+{"ts": "2026-05-30T15:48:24.538082Z", "level": "INFO", "logger": "livekit", "msg": "livekit_ffi::cabi:50:livekit_ffi::cabi - initializing ffi server v0.12.56", "module": "_ffi_client", "line": 174}
+{"ts": "2026-05-30T15:48:24.543512Z", "level": "INFO", "logger": "livekit.agents", "msg": "Downloading files for livekit.plugins.deepgram", "module": "cli", "line": 1975}
+{"ts": "2026-05-30T15:48:24.544703Z", "level": "INFO", "logger": "livekit.agents", "msg": "Finished downloading files for livekit.plugins.deepgram", "module": "cli", "line": 1977}
+{"ts": "2026-05-30T15:48:24.545647Z", "level": "INFO", "logger": "livekit.agents", "msg": "Downloading files for livekit.plugins.openai", "module": "cli", "line": 1975}
+{"ts": "2026-05-30T15:48:24.546521Z", "level": "INFO", "logger": "livekit.agents", "msg": "Finished downloading files for livekit.plugins.openai", "module": "cli", "line": 1977}
+{"ts": "2026-05-30T15:48:24.547368Z", "level": "INFO", "logger": "livekit.agents", "msg": "Downloading files for livekit.plugins.silero", "module": "cli", "line": 1975}
+{"ts": "2026-05-30T15:48:24.548207Z", "level": "INFO", "logger": "livekit.agents", "msg": "Finished downloading files for livekit.plugins.silero", "module": "cli", "line": 1977}
+{"ts": "2026-05-30T15:49:38.340604Z", "level": "INFO", "logger": "root", "msg": "Logging configured", "module": "logger", "line": 116, "context": {"log_dir": "./logs", "level": "INFO"}}
+{"ts": "2026-05-30T15:49:38.340800Z", "level": "INFO", "logger": "__main__", "msg": "============================================================", "module": "main", "line": 32}
+{"ts": "2026-05-30T15:49:38.340834Z", "level": "INFO", "logger": "__main__", "msg": "LiveKit Voice AI Agent Starting", "module": "main", "line": 33}
+{"ts": "2026-05-30T15:49:38.340860Z", "level": "INFO", "logger": "__main__", "msg": "  LLM Model:    gpt-4o-mini", "module": "main", "line": 34}
+{"ts": "2026-05-30T15:49:38.340880Z", "level": "INFO", "logger": "__main__", "msg": "  TTS Voice:    alloy", "module": "main", "line": 35}
+{"ts": "2026-05-30T15:49:38.340898Z", "level": "INFO", "logger": "__main__", "msg": "  LiveKit URL:  ", "module": "main", "line": 36}
+{"ts": "2026-05-30T15:49:38.340916Z", "level": "INFO", "logger": "__main__", "msg": "  Log Dir:      ./logs", "module": "main", "line": 37}
+{"ts": "2026-05-30T15:49:38.340932Z", "level": "INFO", "logger": "__main__", "msg": "============================================================", "module": "main", "line": 38}
+{"ts": "2026-05-30T15:49:38.340964Z", "level": "INFO", "logger": "monitoring.cost_tracker", "msg": "CostTracker initialised", "module": "cost_tracker", "line": 107}
+{"ts": "2026-05-30T15:50:22.995865Z", "level": "INFO", "logger": "root", "msg": "Logging configured", "module": "logger", "line": 116, "context": {"log_dir": "./logs", "level": "INFO"}}
+{"ts": "2026-05-30T15:50:22.995952Z", "level": "INFO", "logger": "__main__", "msg": "============================================================", "module": "main", "line": 32}
+{"ts": "2026-05-30T15:50:22.995991Z", "level": "INFO", "logger": "__main__", "msg": "LiveKit Voice AI Agent Starting", "module": "main", "line": 33}
+{"ts": "2026-05-30T15:50:22.996020Z", "level": "INFO", "logger": "__main__", "msg": "  LLM Model:    gpt-4o-mini", "module": "main", "line": 34}
+{"ts": "2026-05-30T15:50:22.996047Z", "level": "INFO", "logger": "__main__", "msg": "  TTS Voice:    alloy", "module": "main", "line": 35}
+{"ts": "2026-05-30T15:50:22.996069Z", "level": "INFO", "logger": "__main__", "msg": "  LiveKit URL:  ", "module": "main", "line": 36}
+{"ts": "2026-05-30T15:50:22.996091Z", "level": "INFO", "logger": "__main__", "msg": "  Log Dir:      ./logs", "module": "main", "line": 37}
+{"ts": "2026-05-30T15:50:22.996112Z", "level": "INFO", "logger": "__main__", "msg": "============================================================", "module": "main", "line": 38}
+{"ts": "2026-05-30T15:50:22.996153Z", "level": "INFO", "logger": "monitoring.cost_tracker", "msg": "CostTracker initialised", "module": "cost_tracker", "line": 107}
+{"ts": "2026-05-30T15:51:31.340209Z", "level": "INFO", "logger": "root", "msg": "Logging configured", "module": "logger", "line": 116, "context": {"log_dir": "./logs", "level": "INFO"}}
+{"ts": "2026-05-30T15:51:31.340295Z", "level": "INFO", "logger": "__main__", "msg": "============================================================", "module": "main", "line": 32}
+{"ts": "2026-05-30T15:51:31.340333Z", "level": "INFO", "logger": "__main__", "msg": "LiveKit Voice AI Agent Starting", "module": "main", "line": 33}
+{"ts": "2026-05-30T15:51:31.340362Z", "level": "INFO", "logger": "__main__", "msg": "  LLM Model:    gpt-4o-mini", "module": "main", "line": 34}
+{"ts": "2026-05-30T15:51:31.340385Z", "level": "INFO", "logger": "__main__", "msg": "  TTS Voice:    alloy", "module": "main", "line": 35}
+{"ts": "2026-05-30T15:51:31.340406Z", "level": "INFO", "logger": "__main__", "msg": "  LiveKit URL:  ", "module": "main", "line": 36}
+{"ts": "2026-05-30T15:51:31.340427Z", "level": "INFO", "logger": "__main__", "msg": "  Log Dir:      ./logs", "module": "main", "line": 37}
+{"ts": "2026-05-30T15:51:31.340448Z", "level": "INFO", "logger": "__main__", "msg": "============================================================", "module": "main", "line": 38}
+{"ts": "2026-05-30T15:51:31.340491Z", "level": "INFO", "logger": "monitoring.cost_tracker", "msg": "CostTracker initialised", "module": "cost_tracker", "line": 107}
+{"ts": "2026-05-30T15:52:07.047354Z", "level": "INFO", "logger": "root", "msg": "Logging configured", "module": "logger", "line": 116, "context": {"log_dir": "./logs", "level": "INFO"}}
+{"ts": "2026-05-30T15:52:07.047446Z", "level": "INFO", "logger": "__main__", "msg": "============================================================", "module": "main", "line": 32}
+{"ts": "2026-05-30T15:52:07.047484Z", "level": "INFO", "logger": "__main__", "msg": "LiveKit Voice AI Agent Starting", "module": "main", "line": 33}
+{"ts": "2026-05-30T15:52:07.047510Z", "level": "INFO", "logger": "__main__", "msg": "  LLM Model:    gpt-4o-mini", "module": "main", "line": 34}
+{"ts": "2026-05-30T15:52:07.047534Z", "level": "INFO", "logger": "__main__", "msg": "  TTS Voice:    alloy", "module": "main", "line": 35}
+{"ts": "2026-05-30T15:52:07.047557Z", "level": "INFO", "logger": "__main__", "msg": "  LiveKit URL:  ", "module": "main", "line": 36}
+{"ts": "2026-05-30T15:52:07.047579Z", "level": "INFO", "logger": "__main__", "msg": "  Log Dir:      ./logs", "module": "main", "line": 37}
+{"ts": "2026-05-30T15:52:07.047669Z", "level": "INFO", "logger": "__main__", "msg": "============================================================", "module": "main", "line": 38}
+{"ts": "2026-05-30T15:52:07.047706Z", "level": "INFO", "logger": "monitoring.cost_tracker", "msg": "CostTracker initialised", "module": "cost_tracker", "line": 107}
