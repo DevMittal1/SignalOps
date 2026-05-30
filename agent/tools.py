@@ -153,18 +153,18 @@ class PipelineReviewTools(llm.FunctionContext):
         }
         return {"definition": definitions.get(term.lower(), "I don't have a specific definition for that term in my policy.")}
 
-    @llm.ai_callable(description="Generate sharp management-style follow-up questions for vague statements.")
-    def ask_manager_style_followup(
+    @llm.ai_callable(description="Retrieve a static list of sharp management-style follow-up questions to use when a rep gives a vague answer.")
+    def get_static_followup(
         self,
         statement: Annotated[str, llm.TypeInfo(description="The vague statement made by the rep.")]
     ) -> dict:
-        logger.info(f"Tool call: ask_manager_style_followup(statement={statement})")
+        logger.info(f"Tool call: get_static_followup(statement={statement})")
         return {
-            "followups": [
+            "questions": [
                 "What specifically are they reviewing?",
-                "Who owns that review?",
-                "What result are they waiting for?",
-                "Has a timeline been shared?"
+                "Who owns that review on their side?",
+                "What exact result are they waiting for?",
+                "Has a concrete timeline been shared with you?"
             ]
         }
 
