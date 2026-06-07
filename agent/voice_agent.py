@@ -48,6 +48,7 @@ class CallSession:
     total_tokens: int = 0
     transcript: list = field(default_factory=list)
     metadata: dict = field(default_factory=dict)
+    room: Optional[rtc.Room] = None         # LiveKit Room reference
 
     @property
     def duration_seconds(self) -> float:
@@ -107,6 +108,15 @@ class VoiceAIAgent:
             })
             self.agent_logger.log_turn(session, role="user", text=text)
             logger.info(f"[{session.session_id}] USER: {text[:120]}")
+            
+            # Broadcast user transcript to frontend
+            if session.room:
+                payload = json.dumps({
+                    "type": "TRANSCRIPT",
+                    "role": "user",
+                    "text": text
+                })
+                asyncio.create_task(session.room.local_participant.publish_data(payload))
 
         elif item.role == "assistant":
             # Estimate tokens for cost tracking (rough: 1 token ≈ 4 chars)
@@ -123,6 +133,15 @@ class VoiceAIAgent:
             self.agent_logger.log_turn(session, role="assistant", text=text)
             logger.info(f"[{session.session_id}] AGENT: {text[:120]}")
 
+            # Broadcast agent transcript to frontend
+            if session.room:
+                payload = json.dumps({
+                    "type": "TRANSCRIPT",
+                    "role": "assistant",
+                    "text": text
+                })
+                asyncio.create_task(session.room.local_participant.publish_data(payload))
+
     def _handle_function_calls(self, session: CallSession, event: Any):
         """Log structured tool call information."""
         for call in event.function_calls:
@@ -131,6 +150,18 @@ class VoiceAIAgent:
                 function_name=call.name,
                 arguments=call.arguments,
             )
+            # Broadcast tool execution event to frontend
+            if session.room:
+                try:
+                    args_dict = json.loads(call.arguments) if isinstance(call.arguments, str) else call.arguments
+                except Exception:
+                    args_dict = call.arguments
+                payload = json.dumps({
+                    "type": "TOOL_EXECUTION",
+                    "function": call.name,
+                    "arguments": args_dict
+                })
+                asyncio.create_task(session.room.local_participant.publish_data(payload))
 
     async def _generate_and_speak_greeting(self, session: CallSession, assistant: AgentSession, lm: llm.LLM):
         """Generate a dynamic greeting and say it to the user."""
@@ -157,12 +188,34 @@ class VoiceAIAgent:
                 "type": "initial_greeting"
             })
             
+            # Broadcast greeting transcript to frontend
+            if session.room:
+                payload = json.dumps({
+                    "type": "TRANSCRIPT",
+                    "role": "assistant",
+                    "text": greeting_text
+                })
+                await session.room.local_participant.publish_data(payload)
+
             await assistant.say(greeting_text, allow_interruptions=True)
             logger.info(f"[{session.session_id}] Dynamic Greeting: {greeting_text}")
             
         except Exception as e:
             logger.exception(f"[{session.session_id}] Failed to generate dynamic greeting: {e}")
             fallback_greeting = "Hi there, I'm an AI assistant calling for a brief pipeline check. Does now work?"
+            
+            # Broadcast fallback greeting transcript to frontend
+            if session.room:
+                try:
+                    payload = json.dumps({
+                        "type": "TRANSCRIPT",
+                        "role": "assistant",
+                        "text": fallback_greeting
+                    })
+                    await session.room.local_participant.publish_data(payload)
+                except Exception:
+                    pass
+
             await assistant.say(fallback_greeting, allow_interruptions=True)
 
     async def entrypoint(self, ctx: JobContext):
@@ -176,6 +229,7 @@ class VoiceAIAgent:
             rep_id=meta.get("rep_id", "rep_204"),
             deal_id=meta.get("deal_id", "deal_8931"),
             metadata=meta,
+            room=ctx.room,
         )
         self._active_sessions[session.session_id] = session
 
@@ -184,7 +238,6 @@ class VoiceAIAgent:
 
         await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
-        # STT — Deepgram Nova-2 (optimised for telephony)
         stt = deepgram.STT(
             model="nova-2-phonecall",
             language="en-US",
@@ -193,10 +246,8 @@ class VoiceAIAgent:
             interim_results=True,
         )
 
-        # Function Context — Sharp pipeline tools
         fnc_ctx = PipelineReviewTools(id="pipeline_review_tools")
 
-        # LLM — Gemini (high performance + cost-effective for voice)
         initial_ctx = llm.ChatContext()
         initial_ctx.add_message(
             role="system",
@@ -208,7 +259,6 @@ class VoiceAIAgent:
             api_key=self.config.get("google_api_key"),
         )
 
-        # TTS — Deepgram Aura (low latency, no OpenAI key required)
         tts = deepgram.TTS()
 
         # VAD — Silero for precise end-of-speech detection
@@ -305,7 +355,7 @@ async def _global_entrypoint(ctx: JobContext):
     await agent.entrypoint(ctx)
 
 
-def create_agent_worker(config: dict) -> WorkerOptions:
+def create_agent_worker() -> WorkerOptions:
     return WorkerOptions(
         entrypoint_fnc=_global_entrypoint,
         worker_type=WorkerType.ROOM,

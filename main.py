@@ -1,8 +1,3 @@
-"""
-Main Entrypoint
-Starts the LiveKit agent worker directly.
-"""
-
 import logging
 import os
 import sys
@@ -34,22 +29,10 @@ def main():
 
     logger.info("=" * 60)
     logger.info("LiveKit Voice AI Agent Starting")
-    logger.info(f"  LLM Model:    {config.llm_model}")
-    logger.info(f"  TTS Voice:    {config.tts_voice}")
-    logger.info(f"  LiveKit URL:  {config.livekit_url}")
-    logger.info(f"  Log Dir:      {config.log_dir}")
     logger.info("=" * 60)
 
-    # Configure the LiveKit Agent Worker
-    agent_config = {
-        "llm_model": config.llm_model,
-        "tts_voice": config.tts_voice,
-        "greeting": config.greeting,
-    }
-
-    worker_options = create_agent_worker(agent_config)
-
-    # Start LiveKit worker (this is blocking)
+    worker_options = create_agent_worker()
+    
     cli.run_app(worker_options)
 
 

@@ -9,7 +9,7 @@ import logging
 import logging.handlers
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -21,7 +21,7 @@ class JSONFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         log_entry = {
-            "ts": datetime.utcfromtimestamp(record.created).isoformat() + "Z",
+            "ts": datetime.fromtimestamp(record.created, tz=timezone.utc).replace(tzinfo=None).isoformat() + "Z",
             "level": record.levelname,
             "logger": record.name,
             "msg": record.getMessage(),
@@ -52,7 +52,7 @@ class HumanFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         color = self.COLORS.get(record.levelname, "")
         reset = self.COLORS["RESET"]
-        ts = datetime.utcfromtimestamp(record.created).strftime("%H:%M:%S.%f")[:-3]
+        ts = datetime.fromtimestamp(record.created, tz=timezone.utc).strftime("%H:%M:%S.%f")[:-3]
         msg = record.getMessage()
 
         ctx = ""
@@ -133,7 +133,7 @@ class AgentLogger:
         self._logger = logging.getLogger("agent.session")
 
     def _write_event(self, file_path: Path, event: dict) -> None:
-        event.setdefault("ts", datetime.utcnow().isoformat() + "Z")
+        event.setdefault("ts", datetime.now(tz=timezone.utc).replace(tzinfo=None).isoformat() + "Z")
         with open(file_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(event, default=str) + "\n")
 

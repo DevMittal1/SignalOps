@@ -13,7 +13,7 @@ class PipelineReviewTools(llm.Toolset):
     """
 
     @llm.function_tool(description="Get the purpose and context for calling a specific sales rep.")
-    def get_call_context(
+    async def get_call_context(
         self,
         rep_id: Annotated[str, Field(description="The unique ID of the sales representative.")]
     ) -> dict:
@@ -27,7 +27,7 @@ class PipelineReviewTools(llm.Toolset):
         }
 
     @llm.function_tool(description="Retrieve official policy answers about call recording, privacy, and data usage.")
-    def get_agent_policy(
+    async def get_agent_policy(
         self,
         topic: Annotated[str, Field(description="The topic to look up (e.g., 'recording', 'privacy', 'visibility', 'quota').")]
     ) -> dict:
@@ -41,7 +41,7 @@ class PipelineReviewTools(llm.Toolset):
         return {"answer": policies.get(topic, "I don't have a specific policy on that topic, but I can tell you this is a standard pipeline visibility check.")}
 
     @llm.function_tool(description="Fetch the core details of a specific deal from the CRM.")
-    def get_deal_context(
+    async def get_deal_context(
         self,
         deal_id: Annotated[str, Field(description="The unique ID of the deal/opportunity.")]
     ) -> dict:
@@ -58,7 +58,7 @@ class PipelineReviewTools(llm.Toolset):
         }
 
     @llm.function_tool(description="Fetch the history of stage changes and close-date movements for a deal.")
-    def get_deal_timeline(
+    async def get_deal_timeline(
         self,
         deal_id: Annotated[str, Field(description="The unique ID of the deal.")]
     ) -> dict:
@@ -73,7 +73,7 @@ class PipelineReviewTools(llm.Toolset):
         }
 
     @llm.function_tool(description="Retrieve historical profile and performance patterns for a sales rep.")
-    def get_rep_context(
+    async def get_rep_context(
         self,
         rep_id: Annotated[str, Field(description="The unique ID of the sales representative.")]
     ) -> dict:
@@ -88,7 +88,7 @@ class PipelineReviewTools(llm.Toolset):
         }
 
     @llm.function_tool(description="Retrieve summary and objections from the last customer interaction.")
-    def get_last_customer_interaction(
+    async def get_last_customer_interaction(
         self,
         deal_id: Annotated[str, Field(description="The unique ID of the deal.")]
     ) -> dict:
@@ -101,7 +101,7 @@ class PipelineReviewTools(llm.Toolset):
         }
 
     @llm.function_tool(description="Retrieve the stakeholder map for a deal, including champion and blockers.")
-    def get_stakeholder_map(
+    async def get_stakeholder_map(
         self,
         deal_id: Annotated[str, Field(description="The unique ID of the deal.")]
     ) -> dict:
@@ -115,7 +115,7 @@ class PipelineReviewTools(llm.Toolset):
         }
 
     @llm.function_tool(description="Get activity health metrics (emails, meetings, outreach) for a deal.")
-    def get_activity_health(
+    async def get_activity_health(
         self,
         deal_id: Annotated[str, Field(description="The unique ID of the deal.")]
     ) -> dict:
@@ -130,7 +130,7 @@ class PipelineReviewTools(llm.Toolset):
         }
 
     @llm.function_tool(description="Inspect internal dependencies that may be blocking a deal.")
-    def get_internal_dependency_status(
+    async def get_internal_dependency_status(
         self,
         deal_id: Annotated[str, Field(description="The unique ID of the deal.")]
     ) -> dict:
@@ -143,7 +143,7 @@ class PipelineReviewTools(llm.Toolset):
         }
 
     @llm.function_tool(description="Define a business or pipeline-specific term for the rep.")
-    def explain_term(
+    async def explain_term(
         self,
         term: Annotated[str, Field(description="The term to define.")]
     ) -> dict:
@@ -156,7 +156,7 @@ class PipelineReviewTools(llm.Toolset):
         return {"definition": definitions.get(term.lower(), "I don't have a specific definition for that term in my policy.")}
 
     @llm.function_tool(description="Retrieve a static list of sharp management-style follow-up questions to use when a rep gives a vague answer.")
-    def get_static_followup(
+    async def get_static_followup(
         self,
         statement: Annotated[str, Field(description="The vague statement made by the rep.")]
     ) -> dict:
@@ -171,7 +171,7 @@ class PipelineReviewTools(llm.Toolset):
         }
 
     @llm.function_tool(description="Store a verified fact discovered during the call conversation.")
-    def append_call_fact(
+    async def append_call_fact(
         self,
         call_id: Annotated[str, Field(description="The unique ID of the current call session.")],
         fact_type: Annotated[str, Field(description="The type of fact (e.g., 'blocker_candidate', 'owner').")],
@@ -182,7 +182,7 @@ class PipelineReviewTools(llm.Toolset):
         return {"success": True}
 
     @llm.function_tool(description="Persist the final structured summary and evidence at the end of the call.")
-    def save_call_summary(
+    async def save_call_summary(
         self,
         call_id: Annotated[str, Field(description="The unique ID of the call session.")],
         deal_id: Annotated[str, Field(description="The deal ID.")],

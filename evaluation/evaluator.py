@@ -15,7 +15,7 @@ import logging
 import os
 import re
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 import httpx
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class EvaluationResult:
     session_id: str
-    evaluated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    evaluated_at: str = field(default_factory=lambda: datetime.now(tz=timezone.utc).replace(tzinfo=None).isoformat())
 
     # Scores (0.0–1.0)
     quality_score: float = 0.0
@@ -158,6 +158,45 @@ class ConversationEvaluator:
             transcript = transcript[: self.max_transcript_chars] + "\n... [transcript truncated]"
         return transcript
 
+    def _parse_json_robustly(self, raw: str) -> dict:
+        raw = raw.strip()
+        # Remove markdown wrapper
+        if raw.startswith("```"):
+            start = raw.find("{")
+            end = raw.rfind("}")
+            if start != -1 and end != -1:
+                raw = raw[start:end+1]
+        
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            # Try to fix missing commas between key-value pairs
+            lines = raw.splitlines()
+            rebuilt = []
+            for i, line in enumerate(lines):
+                trimmed = line.strip()
+                if (
+                    trimmed
+                    and ":" in trimmed
+                    and not trimmed.endswith(",")
+                    and not trimmed.endswith("{")
+                    and not trimmed.endswith("[")
+                ):
+                    # Check if next non-empty line starts with a double quote (key) or close brace
+                    has_next_key = False
+                    for next_line in lines[i+1:]:
+                        next_trimmed = next_line.strip()
+                        if next_trimmed:
+                            if next_trimmed.startswith('"') or next_trimmed.startswith('}'):
+                                has_next_key = next_trimmed.startswith('"')
+                            break
+                    if has_next_key:
+                        line = line + ","
+                rebuilt.append(line)
+            
+            repaired_raw = "\n".join(rebuilt)
+            return json.loads(repaired_raw)
+
     async def evaluate_async(self, session: Any) -> dict:
         """Evaluate a completed call session. Returns evaluation dict."""
         if not self.api_key:
@@ -178,6 +217,7 @@ class ConversationEvaluator:
             if model == "gemini-3.5-flash":
                 model = "gpt-4o-mini"
 
+        raw = ""
         try:
             resp = await self._http.post(
                 url,
@@ -195,7 +235,7 @@ class ConversationEvaluator:
             )
             resp.raise_for_status()
             raw = resp.json()["choices"][0]["message"]["content"]
-            eval_data = json.loads(raw)
+            eval_data = self._parse_json_robustly(raw)
 
             result = EvaluationResult(
                 session_id=session.session_id,
@@ -218,7 +258,7 @@ class ConversationEvaluator:
         except httpx.HTTPStatusError as e:
             logger.error(f"OpenAI API error during evaluation: {e.response.status_code}")
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse evaluation JSON: {e}")
+            logger.error(f"Failed to parse evaluation JSON: {e}. Raw response: {raw}")
         except Exception as e:
             logger.error(f"Evaluation failed: {e}", exc_info=True)
 
