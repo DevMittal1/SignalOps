@@ -1803,3 +1803,30 @@ html, body {
 .waveform-bar-animated {
   animation: floatWave 1s infinite alternate;
 }
+
+/* ==========================================================================
+   SignalOps Audit Dashboard Styles
+   ========================================================================== */
+
+.audits-dashboard {
+  animation: fadeIn 0.4s ease-out;
+}
+
+.audit-history-panel {
+  background-color: var(--bg-panel);
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-top: 1rem;
+}
+
+.audit-history-panel strong {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.8;
+}
+
+.badge-warning {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}

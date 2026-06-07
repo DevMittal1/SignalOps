@@ -104,7 +104,7 @@ export default function Page() {
   const [authLoading, setAuthLoading] = useState(false);
 
   // CRM Workspace views state
-  const [currentView, setCurrentView] = useState<'kanban' | 'grid' | 'logs'>('kanban');
+  const [currentView, setCurrentView] = useState<'kanban' | 'grid' | 'logs' | 'audits'>('kanban');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -232,7 +232,7 @@ export default function Page() {
   // Handle switching views and query loads
   useEffect(() => {
     if (authToken) {
-      if (currentView === 'kanban') {
+      if (currentView === 'kanban' || currentView === 'audits') {
         fetchAllDeals();
       } else {
         fetchPaginatedDeals();
@@ -382,7 +382,7 @@ export default function Page() {
       if (res.ok) {
         setShowCreateModal(false);
         setCreateForm({ name: '', amount: '', stage: 'Discovery', close_date: '' });
-        if (currentView === 'kanban') {
+        if (currentView === 'kanban' || currentView === 'audits') {
           fetchAllDeals();
         } else {
           fetchPaginatedDeals();
@@ -411,7 +411,7 @@ export default function Page() {
       });
       const data = await res.json();
       if (res.ok) {
-        if (currentView === 'kanban') {
+        if (currentView === 'kanban' || currentView === 'audits') {
           fetchAllDeals();
         } else {
           fetchPaginatedDeals();
@@ -431,7 +431,7 @@ export default function Page() {
   // Drag simulation / Dropdown stage changes
   const handleStageChange = (id: string, newStage: string) => {
     patchDealFields(id, { stage: newStage }).catch(() => {
-      if (currentView === 'kanban') {
+      if (currentView === 'kanban' || currentView === 'audits') {
         fetchAllDeals();
       } else {
         fetchPaginatedDeals();
@@ -467,7 +467,7 @@ export default function Page() {
       if (res.ok) {
         setSelectedDealId("");
         setSelectedDeal(null);
-        if (currentView === 'kanban') {
+        if (currentView === 'kanban' || currentView === 'audits') {
           fetchAllDeals();
         } else {
           fetchPaginatedDeals();
@@ -592,7 +592,7 @@ export default function Page() {
       console.error("Failed to clear trigger status:", e);
     }
     addCrmLog("System", "Call session terminated.");
-    if (currentView === 'kanban') {
+    if (currentView === 'kanban' || currentView === 'audits') {
       fetchAllDeals();
     } else {
       fetchPaginatedDeals();
@@ -864,6 +864,12 @@ export default function Page() {
           >
             Audited Activities
           </button>
+          <button 
+            className={`view-tab ${currentView === 'audits' ? 'view-tab-active' : ''}`}
+            onClick={() => setCurrentView('audits')}
+          >
+            Voice AI Audits
+          </button>
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem', flexShrink: 0, justifyContent: 'flex-end', alignItems: 'center' }}>
@@ -1087,6 +1093,92 @@ export default function Page() {
             <div className="card" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
               <div style={{ color: 'var(--text-muted)' }}>
                 Select an opportunity to inspect its audited activities list.
+              </div>
+            </div>
+          )}
+
+          {!dealsLoading && currentView === 'audits' && (
+            <div className="audits-dashboard">
+              <div style={{ marginBottom: '2rem' }}>
+                <h3 style={{ color: 'var(--text-primary)', marginBottom: '1rem', fontSize: '1.25rem' }}>Pending Voice Audits</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {deals.filter(d => !d.calls || d.calls.length === 0 || (Date.now() - (d.calls[d.calls.length - 1].timestamp * 1000) > 14 * 24 * 60 * 60 * 1000)).map((deal, idx) => (
+                    <div key={idx} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem' }}>
+                      <div>
+                        <div style={{ color: 'var(--text-primary)', fontWeight: '600', marginBottom: '0.25rem' }}>{deal.name}</div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                          Stage: {deal.stage} • Amount: ${deal.amount?.toLocaleString()} • 
+                          {!deal.calls || deal.calls.length === 0 ? " Never Audited" : ` Last Audited: ${new Date(deal.calls[deal.calls.length - 1].timestamp * 1000).toLocaleDateString()}`}
+                        </div>
+                      </div>
+                      <button className="primary-btn" onClick={() => { setSelectedDealId(deal._id); setTimeout(() => handleTriggerTestCall(), 100); }} style={{ padding: '0.5rem 1.5rem' }}>
+                        Start Voice Audit
+                      </button>
+                    </div>
+                  ))}
+                  {deals.filter(d => !d.calls || d.calls.length === 0 || (Date.now() - (d.calls[d.calls.length - 1].timestamp * 1000) > 14 * 24 * 60 * 60 * 1000)).length === 0 && (
+                    <div style={{ color: 'var(--text-muted)', padding: '1rem', backgroundColor: 'var(--bg-card)', borderRadius: '0.5rem', textAlign: 'center' }}>
+                      No pending audits! All pipelines are up to date.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <h3 style={{ color: 'var(--text-primary)', marginBottom: '1rem', fontSize: '1.25rem' }}>Completed Audits</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {deals.filter(d => d.calls && d.calls.length > 0 && (Date.now() - (d.calls[d.calls.length - 1].timestamp * 1000) <= 14 * 24 * 60 * 60 * 1000)).map((deal, idx) => (
+                    <div key={idx} className="card" style={{ padding: '1.25rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                        <div>
+                          <div style={{ color: 'var(--text-primary)', fontWeight: '600', marginBottom: '0.25rem' }}>{deal.name}</div>
+                          <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                            Last Audited: {new Date(deal.calls[deal.calls.length - 1].timestamp * 1000).toLocaleString()} • Duration: {Math.round(deal.calls[deal.calls.length - 1].duration_seconds)}s
+                          </div>
+                        </div>
+                        <button className="secondary-btn" onClick={() => { setSelectedDealId(deal._id); setTimeout(() => handleTriggerTestCall(), 100); }} style={{ fontSize: '0.85rem', padding: '0.4rem 1rem' }}>
+                          Re-audit
+                        </button>
+                      </div>
+                      
+                      <div className="audit-history-panel" style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+                        {deal.calls[deal.calls.length - 1].evaluation?.summary && (
+                          <div style={{ marginBottom: '1rem' }}>
+                            <strong style={{ display: 'block', color: 'var(--text-primary)', marginBottom: '0.25rem', fontSize: '0.85rem' }}>Audit Summary</strong>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', lineHeight: '1.4' }}>{deal.calls[deal.calls.length - 1].evaluation.summary}</p>
+                          </div>
+                        )}
+                        
+                        {(deal.calls[deal.calls.length - 1].actions_taken && deal.calls[deal.calls.length - 1].actions_taken.length > 0) && (
+                          <div style={{ marginBottom: '1rem' }}>
+                            <strong style={{ display: 'block', color: 'var(--text-primary)', marginBottom: '0.25rem', fontSize: '0.85rem' }}>Actions Taken</strong>
+                            <ul style={{ margin: 0, paddingLeft: '1.5rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                              {deal.calls[deal.calls.length - 1].actions_taken.map((action: any, aIdx: number) => (
+                                <li key={aIdx}>{action.description}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {(deal.calls[deal.calls.length - 1].tools_called && deal.calls[deal.calls.length - 1].tools_called.length > 0) && (
+                          <div style={{ marginBottom: '1rem' }}>
+                            <strong style={{ display: 'block', color: 'var(--text-primary)', marginBottom: '0.25rem', fontSize: '0.85rem' }}>Tools Triggered</strong>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                              {deal.calls[deal.calls.length - 1].tools_called.map((tool: any, tIdx: number) => (
+                                <span key={tIdx} className="badge badge-warning" style={{ fontSize: '0.75rem' }}>{tool.function}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {deals.filter(d => d.calls && d.calls.length > 0 && (Date.now() - (d.calls[d.calls.length - 1].timestamp * 1000) <= 14 * 24 * 60 * 60 * 1000)).length === 0 && (
+                    <div style={{ color: 'var(--text-muted)', padding: '1rem', backgroundColor: 'var(--bg-card)', borderRadius: '0.5rem', textAlign: 'center' }}>
+                      No recently completed audits.
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}

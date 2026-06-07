@@ -50,6 +50,8 @@ class CallSession:
     turn_count: int = 0
     total_tokens: int = 0
     transcript: list = field(default_factory=list)
+    tools_called: list = field(default_factory=list)
+    actions_taken: list = field(default_factory=list)
     metadata: dict = field(default_factory=dict)
     room: Optional[rtc.Room] = None         # LiveKit Room reference
 
@@ -229,6 +231,12 @@ class VoiceAIAgent:
                 })
                 asyncio.create_task(session.room.local_participant.publish_data(payload))
 
+            session.tools_called.append({
+                "function": call.name,
+                "arguments": args_dict,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            })
+
             # Database persistence
             if call.name == "append_call_fact":
                 try:
@@ -238,11 +246,19 @@ class VoiceAIAgent:
                         args_dict.get("value"),
                         float(args_dict.get("confidence", 1.0))
                     )
+                    session.actions_taken.append({
+                        "description": f"Added fact [{args_dict.get('fact_type')}]: {args_dict.get('value')}",
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    })
                 except Exception as e:
                     logger.error(f"Failed to persist fact to db: {e}")
             elif call.name == "save_call_summary":
                 try:
                     self._db_save_summary(session.deal_id, args_dict)
+                    session.actions_taken.append({
+                        "description": f"Saved call summary: {args_dict.get('next_steps', 'No next steps specified')}",
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    })
                 except Exception as e:
                     logger.error(f"Failed to persist summary to db: {e}")
 
@@ -594,6 +610,8 @@ class VoiceAIAgent:
                     "turn_count": session.turn_count,
                     "total_tokens": session.total_tokens,
                     "transcript": session.transcript,
+                    "tools_called": session.tools_called,
+                    "actions_taken": session.actions_taken,
                     "cost_summary": cost_summary or {},
                     "evaluation": eval_result,
                     "timestamp": time.time()

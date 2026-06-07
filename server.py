@@ -519,7 +519,7 @@ class TriggerHTTPServer(BaseHTTPRequestHandler):
                                 "rep_id": "rep_204",
                                 "from_number": "direct_webrtc"
                             })
-                            await lk.room.create_room(name=room, metadata=meta_str)
+                            await lk.room.create_room(api.CreateRoomRequest(name=room, metadata=meta_str))
                             logger.info(f"Set room metadata for '{room}': {meta_str}")
                     
                     asyncio.run(set_room_metadata())
