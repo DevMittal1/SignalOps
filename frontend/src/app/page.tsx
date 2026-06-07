@@ -29,7 +29,7 @@ import { RoomEvent } from 'livekit-client';
 
 // Constants
 const LIVEKIT_URL = "wss://signalops-rjjzu2g7.livekit.cloud";
-const BACKEND_API = process.env.NEXT_PUBLIC_BACKEND_API || "http://127.0.0.1:8000";
+const BACKEND_API = process.env.NEXT_PUBLIC_BACKEND_API || "";
 
 // --- Subcomponent: LiveKit event hook & data channel parser ---
 function DataChannelListener({ 

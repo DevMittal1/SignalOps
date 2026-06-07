@@ -27,11 +27,12 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      args:
-        - NEXT_PUBLIC_BACKEND_API=${NEXT_PUBLIC_BACKEND_API:-http://127.0.0.1:8000}
     container_name: signalops-frontend
     ports:
       - "3000:3000"
+    environment:
+      - BACKEND_API_INTERNAL=http://api-server:8000
+      - NEXT_PUBLIC_BACKEND_API=""
     depends_on:
       - api-server
     restart: always

@@ -107,7 +107,7 @@ class VoiceAIAgent:
         return value
 
     def _get_deal(self, deal_id: str) -> Optional[dict]:
-        if not self.db_connected or not self.db:
+        if not self.db_connected or self.db is None:
             return None
         deal = self.db["deals"].find_one({"_id": deal_id})
         if not deal:
@@ -247,7 +247,7 @@ class VoiceAIAgent:
                     logger.error(f"Failed to persist summary to db: {e}")
 
     def _db_append_fact(self, deal_id: str, fact_type: str, value: str, confidence: float):
-        if not self.db_connected or not self.db:
+        if not self.db_connected or self.db is None:
             return
         try:
             deals_coll = self.db['deals']
@@ -322,7 +322,7 @@ class VoiceAIAgent:
             logger.error(f"Database error in _db_append_fact: {e}")
 
     def _db_save_summary(self, deal_id: str, summary_data: dict):
-        if not self.db_connected or not self.db:
+        if not self.db_connected or self.db is None:
             return
         try:
             deals_coll = self.db['deals']
@@ -462,7 +462,7 @@ class VoiceAIAgent:
         logger.info(f"[{session.session_id}] Pipeline Review Call started | Rep={session.rep_id} | Deal={session.deal_id}")
 
         # Log call start in MongoDB
-        if self.db_connected and self.db:
+        if self.db_connected and self.db is not None:
             try:
                 self.db['deals'].update_one(
                     {"_id": session.deal_id},
@@ -581,7 +581,7 @@ class VoiceAIAgent:
                 logger.exception(f"[{session.session_id}] Evaluation failed: {e}")
 
         # Save finished call audit session detail to MongoDB
-        if self.db_connected and self.db:
+        if self.db_connected and self.db is not None:
             try:
                 deals_coll = self.db['deals']
                 call_doc = {
