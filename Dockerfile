@@ -1,5 +1,8 @@
 FROM python:3.11-slim
 
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
 WORKDIR /app
 
 # System dependencies for audio processing
@@ -8,8 +11,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy lockfile and pyproject.toml
+COPY pyproject.toml uv.lock ./
+
+# Install dependencies (frozen to ensure lockfile is respected)
+RUN uv sync --frozen --no-install-project
 
 COPY . .
 
@@ -21,9 +27,7 @@ RUN adduser --disabled-password --gecos "" agentuser
 RUN chown -R agentuser:agentuser /app
 USER agentuser
 
+EXPOSE 8000
 EXPOSE 8080
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-  CMD curl -f http://localhost:8080/health || exit 1
-
-CMD ["python", "main.py"]
+CMD ["uv", "run", "main.py", "start"]

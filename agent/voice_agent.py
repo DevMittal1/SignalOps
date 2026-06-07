@@ -8,9 +8,12 @@ import json
 import logging
 import time
 import uuid
+import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Optional
+from pymongo import MongoClient
+from bson import ObjectId
 
 from livekit import rtc
 from livekit.agents import (
@@ -69,14 +72,76 @@ class VoiceAIAgent:
         self.evaluator = ConversationEvaluator()
         self._active_sessions: dict[str, CallSession] = {}
 
+        # MongoDB Connection
+        self.db_connected = False
+        self.db = None
+        mongodb_uri = os.environ.get("MONGODB_URI", "")
+        if mongodb_uri:
+            try:
+                client = MongoClient(mongodb_uri, serverSelectionTimeoutMS=3000)
+                client.admin.command('ping')
+                self.db = client['signalops']
+                self.db_connected = True
+                logger.info("Voice AI Agent successfully connected to MongoDB Atlas")
+            except Exception as e:
+                logger.error(f"Voice AI Agent failed to connect to MongoDB: {e}")
+
     def _build_system_prompt(self, session: CallSession) -> str:
         dynamic_ctx = get_dynamic_context(session.rep_id, session.deal_id)
+        crm_ctx = self._get_crm_context_for_prompt(session.deal_id)
         return (
             SYSTEM_PROMPT + 
             f"\nSession ID: {session.session_id}\n" +
             f"Call started: {session.started_at.strftime('%H:%M UTC')}\n" +
-            dynamic_ctx
+            dynamic_ctx +
+            crm_ctx
         )
+
+    def _serialize_db_value(self, value: Any) -> Any:
+        if isinstance(value, ObjectId):
+            return str(value)
+        if isinstance(value, list):
+            return [self._serialize_db_value(item) for item in value]
+        if isinstance(value, dict):
+            return {key: self._serialize_db_value(item) for key, item in value.items()}
+        return value
+
+    def _get_deal(self, deal_id: str) -> Optional[dict]:
+        if not self.db_connected or not self.db:
+            return None
+        deal = self.db["deals"].find_one({"_id": deal_id})
+        if not deal:
+            try:
+                deal = self.db["deals"].find_one({"_id": ObjectId(deal_id)})
+            except Exception:
+                deal = None
+        return self._serialize_db_value(deal) if deal else None
+
+    def _get_crm_context_for_prompt(self, deal_id: str) -> str:
+        deal = self._get_deal(deal_id)
+        if not deal:
+            return ""
+
+        prompt_deal = {
+            "deal_id": deal.get("_id"),
+            "account_name": deal.get("account_name", deal.get("name")),
+            "opportunity_name": deal.get("name"),
+            "amount": deal.get("amount"),
+            "stage": deal.get("stage"),
+            "close_date": deal.get("close_date"),
+            "priority": deal.get("priority"),
+            "health_score": deal.get("health_score"),
+            "days_in_stage": deal.get("days_in_stage"),
+            "close_date_changes_90d": deal.get("close_date_changes_90d"),
+            "risk_flags": deal.get("risk_flags", []),
+            "next_best_actions": deal.get("next_best_actions", []),
+            "stakeholders": deal.get("stakeholders", {}),
+            "activity_health": deal.get("activity_health", {}),
+            "dependencies": deal.get("dependencies", []),
+            "last_customer_interaction": deal.get("last_customer_interaction", {}),
+            "open_tickets": [ticket for ticket in deal.get("tickets", []) if ticket.get("status") == "open"][:5],
+        }
+        return "\nLive CRM Context For This Selected Deal:\n" + json.dumps(prompt_deal, indent=2) + "\n"
 
     def _parse_room_metadata(self, room_metadata: Optional[str]) -> dict:
         """Parse room metadata safely."""
@@ -151,17 +216,177 @@ class VoiceAIAgent:
                 arguments=call.arguments,
             )
             # Broadcast tool execution event to frontend
+            try:
+                args_dict = json.loads(call.arguments) if isinstance(call.arguments, str) else call.arguments
+            except Exception:
+                args_dict = call.arguments
+
             if session.room:
-                try:
-                    args_dict = json.loads(call.arguments) if isinstance(call.arguments, str) else call.arguments
-                except Exception:
-                    args_dict = call.arguments
                 payload = json.dumps({
                     "type": "TOOL_EXECUTION",
                     "function": call.name,
                     "arguments": args_dict
                 })
                 asyncio.create_task(session.room.local_participant.publish_data(payload))
+
+            # Database persistence
+            if call.name == "append_call_fact":
+                try:
+                    self._db_append_fact(
+                        session.deal_id,
+                        args_dict.get("fact_type"),
+                        args_dict.get("value"),
+                        float(args_dict.get("confidence", 1.0))
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to persist fact to db: {e}")
+            elif call.name == "save_call_summary":
+                try:
+                    self._db_save_summary(session.deal_id, args_dict)
+                except Exception as e:
+                    logger.error(f"Failed to persist summary to db: {e}")
+
+    def _db_append_fact(self, deal_id: str, fact_type: str, value: str, confidence: float):
+        if not self.db_connected or not self.db:
+            return
+        try:
+            deals_coll = self.db['deals']
+            fact_doc = {
+                "type": fact_type,
+                "value": value,
+                "confidence": confidence,
+                "timestamp": time.time()
+            }
+            # Append to facts array
+            deals_coll.update_one(
+                {"_id": deal_id},
+                {"$push": {
+                    "facts": fact_doc,
+                    "events": {
+                        "type": "objection_flagged" if fact_type == "blocker_candidate" else "deal_updated",
+                        "description": f"AI logged fact: {fact_type} = '{value}'",
+                        "timestamp": time.time()
+                    }
+                }}
+            )
+            
+            # Reactively update checklist checklist in MongoDB based on fact content
+            val_lower = value.lower()
+            if fact_type in ["blocker_candidate", "risk", "dependency"] and any(
+                keyword in val_lower for keyword in ["security", "document", "soc2", "questionnaire", "legal", "procurement", "governance", "integration"]
+            ):
+                ticket = {
+                    "id": f"tkt_ai_{int(time.time() * 1000)}",
+                    "text": value,
+                    "status": "open",
+                    "source": "AI Agent (append_call_fact)",
+                    "created_at": time.time()
+                }
+                deals_coll.update_one(
+                    {"_id": deal_id},
+                    {"$push": {"tickets": ticket}}
+                )
+
+            if "documents not prepared" in val_lower or "documents not sent" in val_lower or "questionnaire" in val_lower:
+                deals_coll.update_one(
+                    {"_id": deal_id, "checklist.id": "security_docs"},
+                    {"$set": {"checklist.$.status": "delayed"}}
+                )
+                deals_coll.update_one(
+                    {"_id": deal_id},
+                    {"$push": {
+                        "events": {
+                            "type": "ticket_created",
+                            "description": "Objection flagged: Prepare and deliver security architecture documents status set to delayed.",
+                            "timestamp": time.time()
+                        }
+                    }}
+                )
+            elif "responsible" in val_lower or "sent" in val_lower or "completed" in val_lower:
+                deals_coll.update_one(
+                    {"_id": deal_id, "checklist.id": "security_docs"},
+                    {"$set": {"checklist.$.status": "checked"}}
+                )
+                deals_coll.update_one(
+                    {"_id": deal_id},
+                    {"$push": {
+                        "events": {
+                            "type": "deal_updated",
+                            "description": "Objection cleared: Security architecture documents status set to checked.",
+                            "timestamp": time.time()
+                        }
+                    }}
+                )
+            logger.info(f"DB Fact appended for deal {deal_id}")
+        except Exception as e:
+            logger.error(f"Database error in _db_append_fact: {e}")
+
+    def _db_save_summary(self, deal_id: str, summary_data: dict):
+        if not self.db_connected or not self.db:
+            return
+        try:
+            deals_coll = self.db['deals']
+            summary_doc = {
+                "primary_blocker": summary_data.get("primary_blocker"),
+                "root_cause": summary_data.get("root_cause"),
+                "evidence": summary_data.get("evidence", []),
+                "recommended_next_points": summary_data.get("recommended_next_points", []),
+                "confidence": float(summary_data.get("confidence", 1.0))
+            }
+            # Update summary and checklist item 'summary'
+            deals_coll.update_one(
+                {"_id": deal_id},
+                {"$set": {
+                    "summary": summary_doc,
+                    "health_score": min(95, int((self._get_deal(deal_id) or {}).get("health_score", 55)) + 5),
+                    "last_rep_update_days_ago": 0
+                }}
+            )
+            deals_coll.update_one(
+                {"_id": deal_id, "checklist.id": "summary"},
+                {"$set": {"checklist.$.status": "checked"}}
+            )
+            
+            # Log stage advanced and summary saved events in timeline
+            deals_coll.update_one(
+                {"_id": deal_id},
+                {"$push": {
+                    "events": {
+                        "$each": [
+                            {
+                                "type": "stage_changed",
+                                "description": "Stage advanced to 'Security Review' (via voice summary resolution)",
+                                "timestamp": time.time()
+                            },
+                            {
+                                "type": "summary_saved",
+                                "description": f"AI saved final audit summary: {summary_data.get('primary_blocker')}",
+                                "timestamp": time.time()
+                            }
+                        ]
+                    }
+                }}
+            )
+            
+            # Also check if stakeholder meeting was confirmed based on evidence
+            has_buyer = any("buyer" in e.lower() or "rohit" in e.lower() for e in summary_data.get("evidence", []))
+            deals_coll.update_one(
+                {"_id": deal_id, "checklist.id": "stakeholder"},
+                {"$set": {"checklist.$.status": "checked" if has_buyer else "delayed"}}
+            )
+            deals_coll.update_one(
+                {"_id": deal_id},
+                {"$push": {
+                    "events": {
+                        "type": "deal_updated",
+                        "description": f"Stakeholder meeting status updated to {'checked' if has_buyer else 'delayed'}",
+                        "timestamp": time.time()
+                    }
+                }}
+            )
+            logger.info(f"DB Summary saved for deal {deal_id}")
+        except Exception as e:
+            logger.error(f"Database error in _db_save_summary: {e}")
 
     async def _generate_and_speak_greeting(self, session: CallSession, assistant: AgentSession, lm: llm.LLM):
         """Generate a dynamic greeting and say it to the user."""
@@ -235,6 +460,22 @@ class VoiceAIAgent:
 
         self.agent_logger.log_call_start(session)
         logger.info(f"[{session.session_id}] Pipeline Review Call started | Rep={session.rep_id} | Deal={session.deal_id}")
+
+        # Log call start in MongoDB
+        if self.db_connected and self.db:
+            try:
+                self.db['deals'].update_one(
+                    {"_id": session.deal_id},
+                    {"$push": {
+                        "events": {
+                            "type": "call_started",
+                            "description": f"Voice AI audit session initiated (Session: {session.session_id})",
+                            "timestamp": time.time()
+                        }
+                    }}
+                )
+            except Exception as e:
+                logger.error(f"Database error logging call start: {e}")
 
         await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
@@ -326,6 +567,7 @@ class VoiceAIAgent:
         self.agent_logger.log_call_end(session, cost_summary)
 
         # Quality evaluation (async, non-blocking to caller)
+        eval_result = {}
         if len(session.transcript) >= 2:
             try:
                 eval_result = await self.evaluator.evaluate_async(session)
@@ -337,6 +579,41 @@ class VoiceAIAgent:
                 )
             except Exception as e:
                 logger.exception(f"[{session.session_id}] Evaluation failed: {e}")
+
+        # Save finished call audit session detail to MongoDB
+        if self.db_connected and self.db:
+            try:
+                deals_coll = self.db['deals']
+                call_doc = {
+                    "session_id": session.session_id,
+                    "call_sid": session.call_sid,
+                    "phone_number": session.phone_number,
+                    "started_at": session.started_at.isoformat(),
+                    "ended_at": session.ended_at.isoformat() if session.ended_at else datetime.now(timezone.utc).isoformat(),
+                    "duration_seconds": session.duration_seconds,
+                    "turn_count": session.turn_count,
+                    "total_tokens": session.total_tokens,
+                    "transcript": session.transcript,
+                    "cost_summary": cost_summary or {},
+                    "evaluation": eval_result,
+                    "timestamp": time.time()
+                }
+                deals_coll.update_one(
+                    {"_id": session.deal_id},
+                    {
+                        "$push": {
+                            "calls": call_doc,
+                            "events": {
+                                "type": "call_ended",
+                                "description": f"Voice AI audit completed. Duration: {session.duration_seconds:.0f}s. Quality score: {eval_result.get('quality_score', 0.0):.1f}/10. Sentiment: {eval_result.get('sentiment', 'N/A')}",
+                                "timestamp": time.time()
+                            }
+                        }
+                    }
+                )
+                logger.info(f"DB Call details and audit event successfully saved for deal {session.deal_id}")
+            except Exception as e:
+                logger.error(f"Database error in _finalize_session: {e}")
 
         self._active_sessions.pop(session.session_id, None)
 
