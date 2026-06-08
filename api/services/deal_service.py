@@ -45,7 +45,7 @@ def seed_initial_deals_for_user(username: str, db):
             if inserted:
                 logger.info(f"Seeded {inserted} starter deals for user: {username}")
         except Exception as e:
-            logger.error(f"Error seeding starter deals for user {username}: {e}")
+            logging.exception(f"Error seeding starter deals for user {username}: {e}")
     else: # Mock
         inserted = 0
         for deal in build_default_deals_for_user(username):

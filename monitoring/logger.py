@@ -231,7 +231,7 @@ class AgentLogger:
             "context": context or {},
         }
         self._write_event(self._session_file, event)
-        self._logger.error(
+        self._logging.exception(
             f"Error in session {session_id}: {error}",
             extra={"context": {"session": session_id}},
             exc_info=True,

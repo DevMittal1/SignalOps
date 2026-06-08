@@ -256,11 +256,11 @@ class ConversationEvaluator:
             return result.to_dict()
 
         except httpx.HTTPStatusError as e:
-            logger.error(f"OpenAI API error during evaluation: {e.response.status_code}")
+            logging.exception(f"OpenAI API error during evaluation: {e.response.status_code}")
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse evaluation JSON: {e}. Raw response: {raw}")
+            logging.exception(f"Failed to parse evaluation JSON: {e}. Raw response: {raw}")
         except Exception as e:
-            logger.error(f"Evaluation failed: {e}", exc_info=True)
+            logging.exception(f"Evaluation failed: {e}", exc_info=True)
 
         return EvaluationResult(session_id=session.session_id).to_dict()
 

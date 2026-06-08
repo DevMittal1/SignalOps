@@ -108,7 +108,7 @@ def connect_db():
             db_connected = True
             logger.info("Connected successfully to MongoDB Atlas")
         except Exception as e:
-            logger.error(f"Failed to connect to MongoDB Atlas: {e}. Falling back to in-memory database.")
+            logging.exception(f"Failed to connect to MongoDB Atlas: {e}. Falling back to in-memory database.")
     else:
         logger.warning("MONGODB_URI not set. Running with in-memory database.")
 
@@ -126,7 +126,7 @@ def seed_database():
                 db.create_collection('users')
                 
         except Exception as e:
-            logger.error(f"Failed to seed MongoDB: {e}")
+            logging.exception(f"Failed to seed MongoDB: {e}")
     else:
         if not mock_deals:
             logger.info("Seeding in-memory database with default deals...")

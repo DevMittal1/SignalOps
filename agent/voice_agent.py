@@ -37,6 +37,8 @@ from agent.prompts import SYSTEM_PROMPT, STATIC_CONTEXT, get_dynamic_context
 
 logger = logging.getLogger(__name__)
 
+PUSH_OP = "$push"
+
 
 @dataclass
 class CallSession:
@@ -73,6 +75,7 @@ class VoiceAIAgent:
         self.agent_logger = AgentLogger()
         self.evaluator = ConversationEvaluator()
         self._active_sessions: dict[str, CallSession] = {}
+        self._background_tasks = set()
 
         # MongoDB Connection
         self.db_connected = False
@@ -86,7 +89,7 @@ class VoiceAIAgent:
                 self.db_connected = True
                 logger.info("Voice AI Agent successfully connected to MongoDB Atlas")
             except Exception as e:
-                logger.error(f"Voice AI Agent failed to connect to MongoDB: {e}")
+                logging.exception(f"Voice AI Agent failed to connect to MongoDB: {e}")
 
     def _build_system_prompt(self, session: CallSession) -> str:
         dynamic_ctx = get_dynamic_context(session.rep_id, session.deal_id)
@@ -145,6 +148,12 @@ class VoiceAIAgent:
         }
         return "\nLive CRM Context For This Selected Deal:\n" + json.dumps(prompt_deal, indent=2) + "\n"
 
+    def _create_task(self, coro):
+        task = asyncio.create_task(coro)
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+        return task
+
     def _parse_room_metadata(self, room_metadata: Optional[str]) -> dict:
         """Parse room metadata safely."""
         if not room_metadata:
@@ -183,7 +192,23 @@ class VoiceAIAgent:
                     "role": "user",
                     "text": text
                 })
-                asyncio.create_task(session.room.local_participant.publish_data(payload))
+                self._create_task(session.room.local_participant.publish_data(payload))
+
+            # Database persistence for transcript
+            if self.db_connected and self.db is not None:
+                try:
+                    self.db['deals'].update_one(
+                        {"_id": session.deal_id},
+                        {PUSH_OP: {
+                            "transcript": {
+                                "speaker": "user",
+                                "text": text,
+                                "timestamp": datetime.now(timezone.utc).isoformat()
+                            }
+                        }}
+                    )
+                except Exception as e:
+                    logging.exception(f"Failed to persist transcript to db: {e}")
 
         elif item.role == "assistant":
             # Estimate tokens for cost tracking (rough: 1 token ≈ 4 chars)
@@ -207,7 +232,23 @@ class VoiceAIAgent:
                     "role": "assistant",
                     "text": text
                 })
-                asyncio.create_task(session.room.local_participant.publish_data(payload))
+                self._create_task(session.room.local_participant.publish_data(payload))
+
+            # Database persistence for transcript
+            if self.db_connected and self.db is not None:
+                try:
+                    self.db['deals'].update_one(
+                        {"_id": session.deal_id},
+                        {PUSH_OP: {
+                            "transcript": {
+                                "speaker": "assistant",
+                                "text": text,
+                                "timestamp": datetime.now(timezone.utc).isoformat()
+                            }
+                        }}
+                    )
+                except Exception as e:
+                    logging.exception(f"Failed to persist transcript to db: {e}")
 
     def _handle_function_calls(self, session: CallSession, event: Any):
         """Log structured tool call information."""
@@ -229,7 +270,7 @@ class VoiceAIAgent:
                     "function": call.name,
                     "arguments": args_dict
                 })
-                asyncio.create_task(session.room.local_participant.publish_data(payload))
+                self._create_task(session.room.local_participant.publish_data(payload))
 
             session.tools_called.append({
                 "function": call.name,
@@ -251,7 +292,7 @@ class VoiceAIAgent:
                         "timestamp": datetime.now(timezone.utc).isoformat()
                     })
                 except Exception as e:
-                    logger.error(f"Failed to persist fact to db: {e}")
+                    logging.exception(f"Failed to persist fact to db: {e}")
             elif call.name == "save_call_summary":
                 try:
                     self._db_save_summary(session.deal_id, args_dict)
@@ -259,8 +300,12 @@ class VoiceAIAgent:
                         "description": f"Saved call summary: {args_dict.get('next_steps', 'No next steps specified')}",
                         "timestamp": datetime.now(timezone.utc).isoformat()
                     })
+                    # Auto terminate the call
+                    if session.room:
+                        logger.info(f"[{session.session_id}] Auto-terminating call after summary.")
+                        self._create_task(session.room.disconnect())
                 except Exception as e:
-                    logger.error(f"Failed to persist summary to db: {e}")
+                    logging.exception(f"Failed to persist summary to db: {e}")
 
     def _db_append_fact(self, deal_id: str, fact_type: str, value: str, confidence: float):
         if not self.db_connected or self.db is None:
@@ -276,7 +321,7 @@ class VoiceAIAgent:
             # Append to facts array
             deals_coll.update_one(
                 {"_id": deal_id},
-                {"$push": {
+                {PUSH_OP: {
                     "facts": fact_doc,
                     "events": {
                         "type": "objection_flagged" if fact_type == "blocker_candidate" else "deal_updated",
@@ -300,7 +345,7 @@ class VoiceAIAgent:
                 }
                 deals_coll.update_one(
                     {"_id": deal_id},
-                    {"$push": {"tickets": ticket}}
+                    {PUSH_OP: {"tickets": ticket}}
                 )
 
             if "documents not prepared" in val_lower or "documents not sent" in val_lower or "questionnaire" in val_lower:
@@ -310,7 +355,7 @@ class VoiceAIAgent:
                 )
                 deals_coll.update_one(
                     {"_id": deal_id},
-                    {"$push": {
+                    {PUSH_OP: {
                         "events": {
                             "type": "ticket_created",
                             "description": "Objection flagged: Prepare and deliver security architecture documents status set to delayed.",
@@ -325,7 +370,7 @@ class VoiceAIAgent:
                 )
                 deals_coll.update_one(
                     {"_id": deal_id},
-                    {"$push": {
+                    {PUSH_OP: {
                         "events": {
                             "type": "deal_updated",
                             "description": "Objection cleared: Security architecture documents status set to checked.",
@@ -335,7 +380,7 @@ class VoiceAIAgent:
                 )
             logger.info(f"DB Fact appended for deal {deal_id}")
         except Exception as e:
-            logger.error(f"Database error in _db_append_fact: {e}")
+            logging.exception(f"Database error in _db_append_fact: {e}")
 
     def _db_save_summary(self, deal_id: str, summary_data: dict):
         if not self.db_connected or self.db is None:
@@ -366,7 +411,7 @@ class VoiceAIAgent:
             # Log stage advanced and summary saved events in timeline
             deals_coll.update_one(
                 {"_id": deal_id},
-                {"$push": {
+                {PUSH_OP: {
                     "events": {
                         "$each": [
                             {
@@ -392,7 +437,7 @@ class VoiceAIAgent:
             )
             deals_coll.update_one(
                 {"_id": deal_id},
-                {"$push": {
+                {PUSH_OP: {
                     "events": {
                         "type": "deal_updated",
                         "description": f"Stakeholder meeting status updated to {'checked' if has_buyer else 'delayed'}",
@@ -402,7 +447,7 @@ class VoiceAIAgent:
             )
             logger.info(f"DB Summary saved for deal {deal_id}")
         except Exception as e:
-            logger.error(f"Database error in _db_save_summary: {e}")
+            logging.exception(f"Database error in _db_save_summary: {e}")
 
     async def _generate_and_speak_greeting(self, session: CallSession, assistant: AgentSession, lm: llm.LLM):
         """Generate a dynamic greeting and say it to the user."""
@@ -437,6 +482,22 @@ class VoiceAIAgent:
                     "text": greeting_text
                 })
                 await session.room.local_participant.publish_data(payload)
+            
+            # Database persistence for greeting transcript
+            if self.db_connected and self.db is not None:
+                try:
+                    self.db['deals'].update_one(
+                        {"_id": session.deal_id},
+                        {PUSH_OP: {
+                            "transcript": {
+                                "speaker": "assistant",
+                                "text": greeting_text,
+                                "timestamp": datetime.now(timezone.utc).isoformat()
+                            }
+                        }}
+                    )
+                except Exception as e:
+                    logging.exception(f"Failed to persist transcript to db: {e}")
 
             await assistant.say(greeting_text, allow_interruptions=True)
             logger.info(f"[{session.session_id}] Dynamic Greeting: {greeting_text}")
@@ -482,7 +543,7 @@ class VoiceAIAgent:
             try:
                 self.db['deals'].update_one(
                     {"_id": session.deal_id},
-                    {"$push": {
+                    {PUSH_OP: {
                         "events": {
                             "type": "call_started",
                             "description": f"Voice AI audit session initiated (Session: {session.session_id})",
@@ -491,7 +552,7 @@ class VoiceAIAgent:
                     }}
                 )
             except Exception as e:
-                logger.error(f"Database error logging call start: {e}")
+                logging.exception(f"Database error logging call start: {e}")
 
         await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
 
@@ -619,7 +680,7 @@ class VoiceAIAgent:
                 deals_coll.update_one(
                     {"_id": session.deal_id},
                     {
-                        "$push": {
+                        PUSH_OP: {
                             "calls": call_doc,
                             "events": {
                                 "type": "call_ended",
@@ -631,7 +692,7 @@ class VoiceAIAgent:
                 )
                 logger.info(f"DB Call details and audit event successfully saved for deal {session.deal_id}")
             except Exception as e:
-                logger.error(f"Database error in _finalize_session: {e}")
+                logging.exception(f"Database error in _finalize_session: {e}")
 
         self._active_sessions.pop(session.session_id, None)
 

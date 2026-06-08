@@ -49,7 +49,7 @@ async def generate_token(room: str, identity: str, query_deal_id: str):
         logger.info(f"Generated token for room '{room}', identity '{identity}', deal '{deal_id}'")
         return {"token": token}
     except Exception as e:
-        logger.error(f"Error generating token: {e}")
+        logging.exception(f"Error generating token: {e}")
         raise HTTPException(status_code=500, detail=f"Error generating token: {e}")
 
 def update_trigger_state(data):
