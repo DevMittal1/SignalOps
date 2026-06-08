@@ -1,0 +1,20 @@
+version: "3.8"
+
+services:
+  api-server:
+    image: ghcr.io/devmittal1/signalops:latest
+    container_name: signalops-api-server-prod
+    command: uv run uvicorn server:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    restart: always
+
+  voice-worker:
+    image: ghcr.io/devmittal1/signalops:latest
+    container_name: signalops-voice-worker-prod
+    command: uv run main.py start
+    env_file:
+      - .env
+    restart: always
